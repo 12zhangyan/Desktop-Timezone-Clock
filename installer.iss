@@ -2,7 +2,7 @@
 #define MyAppExeName "DesktopTimezoneClock.exe"
 #define MyAppPublisher "Kanaoda"
 #define MyAppURL "https://github.com/Kanaoda/Desktop-Timezone-Clock"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.1.0"
 
 [Setup]
 AppId={{B3F73D90-5E9E-4A9D-A3D7-3B4DE8E302A2}
@@ -28,8 +28,8 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "autostart"; Description: "開機自動啟動"; GroupDescription: "其他選項:"; Flags: checkedonce
-Name: "desktopicon"; Description: "建立桌面捷徑"; GroupDescription: "其他選項:"
+Name: "autostart"; Description: "开机自动启动"; GroupDescription: "其他选项:"; Flags: checkedonce
+Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "其他选项:"
 
 [Files]
 Source: "dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
@@ -44,4 +44,4 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
     Tasks: autostart; Flags: uninsdeletevalue
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "啟動 {#MyAppName}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent

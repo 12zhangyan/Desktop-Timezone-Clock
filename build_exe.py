@@ -3,7 +3,7 @@ import subprocess
 import sys
 
 def build():
-    # 確保安裝了 pyinstaller
+    # 确保安装了 pyinstaller
     try:
         import PyInstaller
     except ImportError:
@@ -11,21 +11,22 @@ def build():
         subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
 
     # 打包指令
-    # --noconsole: 不顯示控制台視窗
-    # --onefile: 打包成單一 exe
-    # --name: 指定檔名
-    # --add-data: 包含必要的檔案 (Windows 下格式為 "src;dest")
+    # --noconsole: 不显示控制台窗口
+    # --onefile: 打包成单一 exe
+    # --name: 指定文件名
+    # --add-data: 包含必要的文件 (Windows 下格式为 "src;dest")
     
     import customtkinter
     ctk_path = os.path.dirname(customtkinter.__file__)
     
     cmd = [
-        "pyinstaller",
+        sys.executable, "-m", "PyInstaller",
         "--noconsole",
         "--onefile",
         "--name=DesktopTimezoneClock",
         "--clean",
-        # 核心：包含 CustomTkinter 的資源檔 (json/txt)
+        "--collect-all=tzdata",
+        # 核心：包含 CustomTkinter 的资源文件 (json/txt)
         f"--add-data={ctk_path};customtkinter/",
         "main.py"
     ]

@@ -8,23 +8,24 @@ from timezone_utils import get_current_time_in_tz, get_all_timezones_with_offset
 from utils import set_autostart
 from i18n import I18n
 from datetime import datetime
+from clock_format import format_clock
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
-# ── Tech-Dark 調色盤（無藍色）──────────────────────────────────────────────────
+# ── Tech-Dark 调色盘（无蓝色）──────────────────────────────────────────────────
 BG      = "#0D0D10"   # 底色
 SURFACE = "#141418"   # 次底
 CARD    = "#1B1B1F"   # 卡片
-CARD2   = "#232328"   # 輸入框 / 按鈕
-BORDER  = "#2E2E36"   # 邊線
+CARD2   = "#232328"   # 输入框 / 按钮
+BORDER  = "#2E2E36"   # 边线
 TEXT    = "#E8E8EE"   # 主文字
-SUB     = "#B8B8C2"   # 副文字（提高可讀性）
-MUTED   = "#888888"   # 提高亮度以確保在深色背景可見
-SEL_BG  = "#2C2C34"   # 選中行背景
+SUB     = "#B8B8C2"   # 副文字（提高可读性）
+MUTED   = "#888888"   # 提高亮度以确保在深色背景可见
+SEL_BG  = "#2C2C34"   # 选中行背景
 HOVER   = "#252530"   # hover
-SW_ON   = "#00BFA5"   # 開啟：亮青綠
-SW_OFF  = "#4D4D54"   # 關閉：中灰（提高對比度）
+SW_ON   = "#00BFA5"   # 开启：亮青绿
+SW_OFF  = "#4D4D54"   # 关闭：中灰（提高对比度）
 
 GITHUB_SPONSOR_URL = "https://github.com/sponsors/Kanaoda"
 BUY_ME_A_COFFEE_URL = "https://www.buymeacoffee.com/kanaoda"
@@ -40,10 +41,10 @@ def _dark_title(hwnd: int):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 自訂時區選擇彈窗（帶搜尋 + 固定高度可捲動列表）
+# 自定义时区选择弹窗（带搜寻 + 固定高度可卷动列表）
 # ─────────────────────────────────────────────────────────────────────────────
 class _TZPicker:
-    """點擊時區欄後彈出的小視窗，帶搜尋過濾與固定高度滾動列表。"""
+    """点击时区栏后弹出的小窗口，带搜寻过滤与固定高度滚动列表。"""
 
     def __init__(self, parent_win, displays: list, names: list,
                  current_display: str, on_select,
@@ -57,7 +58,7 @@ class _TZPicker:
         self._win.attributes("-topmost", True)
         self._win.resizable(False, False)
 
-        # 搜尋列
+        # 搜寻列
         top = ctk.CTkFrame(self._win, fg_color=CARD2, corner_radius=0)
         top.pack(fill="x")
         self._search_var = ctk.StringVar()
@@ -73,11 +74,11 @@ class _TZPicker:
         entry.focus()
         self._search_var.trace_add("write", lambda *_: self._refresh())
 
-        # 分隔線
+        # 分隔线
         ctk.CTkFrame(self._win, height=1, fg_color=BORDER,
                      corner_radius=0).pack(fill="x")
 
-        # 可捲動列表
+        # 可卷动列表
         self._scroll = ctk.CTkScrollableFrame(
             self._win, fg_color=CARD, corner_radius=0,
             width=340, height=280,
@@ -90,7 +91,7 @@ class _TZPicker:
         self._current = current_display
         self._refresh()
 
-        # 點外關閉
+        # 点外关闭
         self._win.bind("<FocusOut>", self._maybe_close)
         self._win.bind("<Escape>",   lambda e: self._win.destroy())
 
@@ -154,17 +155,17 @@ class _TZPicker:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 輔助元件
+# 辅助组件
 # ─────────────────────────────────────────────────────────────────────────────
 class _Sep(ctk.CTkFrame):
-    """行分隔線。"""
+    """行分隔线。"""
     def __init__(self, parent):
         super().__init__(parent, height=1, fg_color=BORDER, corner_radius=0)
         self.pack(fill="x", padx=14)
 
 
 class _SectionLabel(ctk.CTkLabel):
-    """章節標題（比行內文字更大、更粗）。"""
+    """章节标题（比行内文字更大、更粗）。"""
     def __init__(self, parent, text: str):
         super().__init__(
             parent, text=text,
@@ -176,7 +177,7 @@ class _SectionLabel(ctk.CTkLabel):
 
 
 class _Row(ctk.CTkFrame):
-    """一行設定列：左側標籤 + 右側控件。"""
+    """一行设置列：左侧标签 + 右侧控件。"""
     def __init__(self, parent, label: str, h: int = 44):
         super().__init__(parent, fg_color=CARD, corner_radius=0, height=h)
         self.pack(fill="x")
@@ -194,7 +195,7 @@ class _Row(ctk.CTkFrame):
 
 
 class _Card(ctk.CTkFrame):
-    """帶圓角的卡片容器（無標題——改用 _SectionLabel 在外部放置）。"""
+    """带圆角的卡片容器（无标题——改用 _SectionLabel 在外部放置）。"""
     def __init__(self, parent):
         super().__init__(parent, fg_color=CARD, corner_radius=10,
                          border_width=1, border_color=BORDER)
@@ -202,7 +203,7 @@ class _Card(ctk.CTkFrame):
 
 
 class _TechToggle(ctk.CTkFrame):
-    """小型方形開關（純 CTk，避免 tk.Canvas 相容性問題）。"""
+    """小型方形开关（纯 CTk，避免 tk.Canvas 兼容性问题）。"""
     def __init__(self, parent, variable: tk.BooleanVar, command=None):
         super().__init__(parent, fg_color=CARD, corner_radius=0, width=34, height=18)
         self.pack_propagate(False)
@@ -239,7 +240,7 @@ class _TechToggle(ctk.CTkFrame):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 主視窗
+# 主窗口
 # ─────────────────────────────────────────────────────────────────────────────
 class SettingsWindow:
     def __init__(self, current_config, on_save_callback,
@@ -272,7 +273,7 @@ class SettingsWindow:
         self._place_window()
         self._tick()
 
-    # ── 深色標題列 ────────────────────────────────────────────────────────────
+    # ── 深色标题列 ────────────────────────────────────────────────────────────
     def _apply_dark_title(self):
         try:
             hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
@@ -281,7 +282,7 @@ class SettingsWindow:
             pass
 
     def _place_window(self):
-        """固定置中螢幕，避免父視窗座標造成跑位。"""
+        """固定置中屏幕，避免父窗口座标造成跑位。"""
         w, h = 420, 640
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
@@ -295,9 +296,9 @@ class SettingsWindow:
         self.tz_displays_all = [t["display"] for t in self.tz_data]
         self.tz_names_all = [t["name"] for t in self.tz_data]
 
-    # ── 建構 UI ───────────────────────────────────────────────────────────────
+    # ── 建构 UI ───────────────────────────────────────────────────────────────
     def _build_ui(self):
-        # ttk 原生下拉樣式（即時展開，含 scrollbar）
+        # ttk 原生下拉样式（即时展开，含 scrollbar）
         style = ttk.Style(self.root)
         try:
             style.theme_use("clam")
@@ -337,10 +338,10 @@ class SettingsWindow:
         )
         scroll.pack(fill="both", expand=True)
 
-        # 頂部保留間距（移除頁首標題區塊）
+        # 顶部保留间距（移除页首标题区块）
         ctk.CTkFrame(scroll, height=10, fg_color=BG, corner_radius=0).pack(fill="x")
 
-        # ── 預覽 ──────────────────────────────────────────────────────────────
+        # ── 预览 ──────────────────────────────────────────────────────────────
         _SectionLabel(scroll, self.i18n.get("preview"))
         pv = _Card(scroll)
         self.preview_frame = ctk.CTkFrame(pv, fg_color=CARD, corner_radius=10)
@@ -364,11 +365,11 @@ class SettingsWindow:
             font=ctk.CTkFont(family="Segoe UI", size=13))
         self.target_tz_label.pack(anchor="w")
 
-        # ── 時區 ──────────────────────────────────────────────────────────────
+        # ── 时区 ──────────────────────────────────────────────────────────────
         _SectionLabel(scroll, self.i18n.get("timezone_section"))
         tz_card = _Card(scroll)
 
-        current_tz = self.clock_config.get("target_timezone", "Asia/Hong_Kong")
+        current_tz = self.clock_config.get("target_timezone", "Asia/Shanghai")
         self.tz_display_var = ctk.StringVar()
         try:
             idx = self.tz_names_all.index(current_tz)
@@ -376,7 +377,7 @@ class SettingsWindow:
         except ValueError:
             self.tz_display_var.set(current_tz)
 
-        # 即時下拉選單（非自訂彈窗）
+        # 即时下拉选单（非自定义弹窗）
         tz_row = ctk.CTkFrame(tz_card, fg_color=CARD, corner_radius=0, height=44)
         tz_row.pack(fill="x")
         tz_row.pack_propagate(False)
@@ -393,7 +394,7 @@ class SettingsWindow:
         self.tz_combo.pack(fill="x", padx=12, pady=6)
         self.tz_combo.bind("<<ComboboxSelected>>", self._on_tz_change)
 
-        # ── 外觀 ──────────────────────────────────────────────────────────────
+        # ── 外观 ──────────────────────────────────────────────────────────────
         _SectionLabel(scroll, self.i18n.get("appearance"))
         app_card = _Card(scroll)
         ab = app_card
@@ -408,7 +409,7 @@ class SettingsWindow:
         self.bg_color_mode  = ctk.StringVar(value="system" if raw_bc == "system" else "custom")
         self.bg_color_value = ctk.StringVar(value=raw_bc if raw_bc != "system" else "#000000")
 
-        # 語言
+        # 语言
         r_lang = _Row(ab, self.i18n.get("language_label"))
         self._lang_seg = ctk.CTkSegmentedButton(
             r_lang.right, values=["中文", "EN"],
@@ -426,7 +427,14 @@ class SettingsWindow:
         self._lang_seg.set("中文" if self.lang_var.get() == "zh" else "EN")
         _Sep(ab)
 
-        # 字體大小
+        # Windows 区域格式；关闭后兼容原有自定义格式。
+        self.system_format_var = ctk.BooleanVar(
+            value=self.clock_config.get("format_style", "windows") == "windows")
+        r_format = _Row(ab, self.i18n.get("system_format_label"))
+        _TechToggle(r_format.right, self.system_format_var, self._fire_preview).pack()
+        _Sep(ab)
+
+        # 字体大小
         r_sz = _Row(ab, self.i18n.get("font_size_label"))
         sz = ctk.CTkFrame(r_sz.right, fg_color=CARD, corner_radius=0)
         sz.pack()
@@ -444,33 +452,33 @@ class SettingsWindow:
                       command=lambda: self._adj_size(1)).pack(side="left", padx=(4, 0))
         _Sep(ab)
 
-        # 顯示日期
+        # 显示日期
         r_date = _Row(ab, self.i18n.get("show_date_label"))
         self._date_sw = _TechToggle(r_date.right, self.date_var, command=self._fire_preview)
         self._date_sw.pack()
         _Sep(ab)
 
-        # 文字顏色
+        # 文字颜色
         r_fc = _Row(ab, self.i18n.get("font_color_row"))
         self._build_color_row(
             r_fc.right, self.font_color_mode, self.font_color_value,
             self._pick_font_color, is_bg=False)
         _Sep(ab)
 
-        # 背景顏色
+        # 背景颜色
         r_bc = _Row(ab, self.i18n.get("bg_color_row"))
         self._build_color_row(
             r_bc.right, self.bg_color_mode, self.bg_color_value,
             self._pick_bg_color, is_bg=True)
 
-        # ── 系統 ──────────────────────────────────────────────────────────────
+        # ── 系统 ──────────────────────────────────────────────────────────────
         _SectionLabel(scroll, self.i18n.get("system_section"))
         sys_card = _Card(scroll)
         self.auto_var = ctk.BooleanVar(value=self.config.get("autostart", False))
         r_auto = _Row(sys_card, self.i18n.get("autostart_label"))
         _TechToggle(r_auto.right, self.auto_var, command=self._fire_preview).pack()
 
-        # ── 按鈕 ──────────────────────────────────────────────────────────────
+        # ── 按钮 ──────────────────────────────────────────────────────────────
         ctk.CTkFrame(scroll, height=14, fg_color=BG,
                      corner_radius=0).pack()
         btn_row = ctk.CTkFrame(scroll, fg_color=BG, corner_radius=0)
@@ -492,7 +500,7 @@ class SettingsWindow:
             command=self._save,
         ).pack(side="right")
 
-        # ── 支持作者（底部亮色按鈕）───────────────────────────────────────────
+        # ── 支持作者（底部亮色按钮）───────────────────────────────────────────
         _SectionLabel(scroll, self.i18n.get("support_section"))
         support_card = _Card(scroll)
         support_row = ctk.CTkFrame(support_card, fg_color=CARD, corner_radius=0)
@@ -528,13 +536,13 @@ class SettingsWindow:
                   self.font_color_value, self.bg_color_value):
             v.trace_add("write", lambda *_: self._fire_preview())
 
-    # ── 顏色選色列 ─────────────────────────────────────────────────────────────
+    # ── 颜色选色列 ─────────────────────────────────────────────────────────────
     def _build_color_row(self, parent, mode_var, value_var, pick_cb, is_bg=False):
-        # 增加圖標，強化「自動 / 手動」的視覺區別
+        # 增加图标，强化「自动 / 手动」的视觉区别
         lbl_auto   = "⚡ " + self.i18n.get("color_auto")
         lbl_custom = "🎨 " + self.i18n.get("color_custom")
 
-        # 使用 transparent 背景確保對齊
+        # 使用 transparent 背景确保对齐
         wrap = ctk.CTkFrame(parent, fg_color="transparent", corner_radius=0)
         wrap.pack(side="right")
 
@@ -575,7 +583,7 @@ class SettingsWindow:
                 c = value_var.get()
                 dot.configure(fg_color=c if isinstance(c, str) and c.startswith("#") else CARD2)
             else:
-                # 自動模式下，反映真實獲取的顏色
+                # 自动模式下，反映真实获取的颜色
                 if is_bg:
                     sampled = sample_taskbar_color()
                     dot.configure(fg_color=sampled if sampled else CARD2)
@@ -586,31 +594,32 @@ class SettingsWindow:
         value_var.trace_add("write", _sync)
         mode_var.trace_add("write",  _sync)
         _sync()
-        # 定期刷新自動模式的色塊
+        # 定期刷新自动模式的色块
         parent.after(5000, _sync)
 
     def _on_tz_change(self, _event=None):
         self._update_target_time()
         self._fire_preview()
 
-    # ── 其他控件邏輯 ───────────────────────────────────────────────────────────
+    # ── 其他控件逻辑 ───────────────────────────────────────────────────────────
     def _adj_size(self, d: int):
         self.size_var.set(max(6, min(24, self.size_var.get() + d)))
 
     def _on_seg_lang(self, value):
         new_lang = "zh" if value == "中文" else "en"
-        # 先同步到目前設定，避免重建 UI 後語言狀態回彈
+        # 先同步到目前设置，避免重建 UI 后语言状态回弹
         self.config["language"] = new_lang
         self.lang_var.set(new_lang)
         self.i18n = I18n(new_lang)
         self._reload_timezone_data()
         self.root.title(self.i18n.get("clock_settings"))
 
-        # 語言切換後重建 UI，確保所有標籤即時更新
+        # 语言切换后重建 UI，确保所有标签即时更新
         snapshot = {
             "tz_display": self.tz_display_var.get() if hasattr(self, "tz_display_var") else "",
             "size": self.size_var.get() if hasattr(self, "size_var") else 9,
             "show_date": self.date_var.get() if hasattr(self, "date_var") else True,
+            "system_format": self.system_format_var.get(),
             "font_color_mode": self.font_color_mode.get() if hasattr(self, "font_color_mode") else "system",
             "font_color_value": self.font_color_value.get() if hasattr(self, "font_color_value") else "#FFFFFF",
             "bg_color_mode": self.bg_color_mode.get() if hasattr(self, "bg_color_mode") else "system",
@@ -622,9 +631,10 @@ class SettingsWindow:
             child.destroy()
         self._build_ui()
 
-        # 還原使用者當前值（避免重建後被重置）
+        # 还原用户当前值（避免重建后被重置）
         self.size_var.set(snapshot["size"])
         self.date_var.set(snapshot["show_date"])
+        self.system_format_var.set(snapshot["system_format"])
         self.font_color_mode.set(snapshot["font_color_mode"])
         self.font_color_value.set(snapshot["font_color_value"])
         self.bg_color_mode.set(snapshot["bg_color_mode"])
@@ -639,7 +649,7 @@ class SettingsWindow:
         self._update_target_time()
         self._fire_preview()
 
-    # ── 內部邏輯與事件 ───────────────────────────────────────────────────────────
+    # ── 内部逻辑与事件 ───────────────────────────────────────────────────────────
     def _pick_font_color(self):
         self._pick_color(self.font_color_value, self.font_color_mode, self.i18n.get("choose_font_color"))
 
@@ -680,8 +690,11 @@ class SettingsWindow:
         try:
             idx = self.tz_displays_all.index(dv)
             tz  = self.tz_names_all[idx]
+            config = self._get_current_clock_cfg()
+            time_text, date_text = format_clock(
+                get_current_time_in_tz(tz), config, self.config.get("language", "zh"))
             self.target_time_label.configure(
-                text=get_current_time_in_tz(tz).strftime("%H:%M:%S"))
+                text=f"{time_text}\n{date_text}" if config["show_date"] else time_text)
             self.target_tz_label.configure(text=tz)
         except Exception:
             self.target_time_label.configure(text="--:--:--")
@@ -692,17 +705,18 @@ class SettingsWindow:
         try:
             tz = self.tz_names_all[self.tz_displays_all.index(dv)]
         except ValueError:
-            tz = self.clock_config.get("target_timezone", "Asia/Hong_Kong")
+            tz = self.clock_config.get("target_timezone", "Asia/Shanghai")
         return {
             "target_timezone": tz,
+            "format_style": "windows" if self.system_format_var.get() else "custom",
             "font_size":  self.size_var.get(),
             "show_date":  self.date_var.get(),
             "font_color": ("system" if self.font_color_mode.get() == "system"
                            else self.font_color_value.get()),
             "bg_color":   ("system" if self.bg_color_mode.get()   == "system"
                            else self.bg_color_value.get()),
-            "font_family":  self.clock_config.get("font_family", "Microsoft JhengHei UI"),
-            "time_format":  self.clock_config.get("time_format", "%p %I:%M"),
+            "font_family":  self.clock_config.get("font_family", "Segoe UI"),
+            "time_format":  self.clock_config.get("time_format", "%H:%M"),
             "date_format":  self.clock_config.get("date_format", "%Y/%m/%d"),
             "position":     self.clock_config.get("position",    "overlay_taskbar"),
         }
@@ -711,7 +725,7 @@ class SettingsWindow:
         if self._closed:
             return
 
-        # 1. 更新主程式預覽 (Overlay Window)
+        # 1. 更新主程序预览 (Overlay Window)
         if self.on_preview:
             try:
                 tmp = copy.deepcopy(self.config)
@@ -720,22 +734,22 @@ class SettingsWindow:
             except Exception:
                 pass
 
-        # 2. 更新設定視窗內部的「預覽時鐘」樣式
+        # 2. 更新设置窗口内部的「预览时钟」样式
         from utils import sample_taskbar_color, get_system_theme
         
-        # 決定背景色
+        # 决定背景色
         if self.bg_color_mode.get() == "system":
             bg = sample_taskbar_color()
         else:
             bg = self.bg_color_value.get()
         
-        # 決定文字色
+        # 决定文字色
         if self.font_color_mode.get() == "system":
             fg, _ = get_system_theme()
         else:
             fg = self.font_color_value.get()
 
-        # 套用到預覽元件
+        # 应用到预览组件
         if hasattr(self, 'target_time_label'):
             self.target_time_label.configure(text_color=fg)
         if hasattr(self, 'local_time_label'):
@@ -744,7 +758,7 @@ class SettingsWindow:
             self.target_tz_label.configure(text_color=fg)
             
         if hasattr(self, 'preview_frame'):
-            # 視覺修正：當背景非常亮時，加上邊框以避免「視覺黑洞/白洞」感
+            # 视觉修正：当背景非常亮时，加上边框以避免「视觉黑洞/白洞」感
             is_very_light = False
             if bg and bg.startswith("#"):
                 try:
