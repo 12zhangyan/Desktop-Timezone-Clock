@@ -126,3 +126,27 @@ def find_modern_clock_rect(taskbar_hwnd):
                         cached.update(rect=rect, expires=time.monotonic() + 2, running=False)
             threading.Thread(target=refresh, daemon=True, name="taskbar-clock-query").start()
         return cached["rect"]
+
+
+def enumerate_taskbars():
+    """枚举当前所有屏幕的任务栏，主任务栏排在前面。"""
+    taskbars = []
+    def visit(hwnd, unused):
+        if win32gui.GetClassName(hwnd) in ("Shell_TrayWnd", "Shell_SecondaryTrayWnd"):
+            taskbars.append(hwnd)
+    win32gui.EnumWindows(visit, None)
+    return sorted(taskbars, key=lambda hwnd: (
+        win32gui.GetClassName(hwnd) != "Shell_TrayWnd",
+        win32gui.GetWindowRect(hwnd)[:2],
+    ))
+
+
+def get_window_dpi(hwnd):
+    """返回窗口所在屏幕的 DPI，避免多个 Tk 窗口共用主屏字体缩放。"""
+    try:
+        function = ctypes.WinDLL("user32").GetDpiForWindow
+        function.argtypes = [wintypes.HWND]
+        function.restype = wintypes.UINT
+        return function(hwnd) or 96
+    except (AttributeError, OSError):
+        return 96

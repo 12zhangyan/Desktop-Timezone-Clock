@@ -41,7 +41,7 @@ class CalendarPopup:
     #  INIT                                                                #
     # ------------------------------------------------------------------ #
 
-    def __init__(self, parent, tz_name, language="zh"):
+    def __init__(self, parent, tz_name, language="zh", taskbar_hwnd=None):
         # 清除任何残留实例
         if CalendarPopup._instance is not None:
             try:
@@ -53,6 +53,7 @@ class CalendarPopup:
         self.parent   = parent
         self.tz_name  = tz_name
         self.language = language
+        self._taskbar_wnd = taskbar_hwnd
         self._update_timer  = None
         self._focus_timer   = None
         self._closed = False
@@ -226,20 +227,21 @@ class CalendarPopup:
 
     def _calc_position(self):
         try:
-            tray = win32gui.FindWindow("Shell_TrayWnd", None)
-            if tray:
-                tx, ty, tx2, ty2 = win32gui.GetWindowRect(tray)
-                taskbar_top  = ty
-                screen_right = tx2
-            else:
-                raise RuntimeError("no tray")
+            tray = self._taskbar_wnd or win32gui.FindWindow("Shell_TrayWnd", None)
+            monitor = win32api.MonitorFromWindow(tray, win32con.MONITOR_DEFAULTTONEAREST)
+            left, top, right, bottom = win32api.GetMonitorInfo(monitor)["Work"]
         except Exception:
-            screen_right = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
-            taskbar_top  = win32api.GetSystemMetrics(win32con.SM_CYSCREEN) - 40
+            left, top = 0, 0
+            right = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
+            bottom = win32api.GetSystemMetrics(win32con.SM_CYSCREEN) - 40
+        return max(left, right - self._w - 8), max(top, bottom - self._h - 8)
 
-        x = max(screen_right - self._w - 8, 0)
-        y = max(taskbar_top  - self._h - 8, 0)
-        return x, y
+    def _move_to(self, x, y):
+        hwnd = win32gui.GetParent(self.root.winfo_id()) or self.root.winfo_id()
+        win32gui.SetWindowPos(
+            hwnd, win32con.HWND_TOPMOST, x, y, 0, 0,
+            win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE,
+        )
 
     def _show_positioned(self):
         """显示 popup：先透明定位，再恢复不透明，消除左上角闪烁。"""
@@ -253,7 +255,7 @@ class CalendarPopup:
             self.root.update()
 
             # 移到正确位置
-            self.root.geometry(f"+{x}+{y}")
+            self._move_to(x, y)
             self.root.update_idletasks()
 
             # 恢复不透明（现在才让用户看到）
@@ -293,7 +295,7 @@ class CalendarPopup:
             return
         x = event.x_root - self._drag_start_x
         y = event.y_root - self._drag_start_y
-        self.root.geometry(f"+{x}+{y}")
+        self._move_to(x, y)
 
     # ------------------------------------------------------------------ #
     #  FOCUS OUT → 点击外部关闭                                           #

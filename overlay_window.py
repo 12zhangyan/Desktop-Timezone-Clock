@@ -11,13 +11,13 @@ import win32api
 
 from timezone_utils import get_current_time_in_tz
 from clock_format import format_clock
-from taskbar_clock import find_modern_clock_rect
+from taskbar_clock import find_modern_clock_rect, get_window_dpi
 from utils import get_system_theme, sample_taskbar_color
 from calendar_popup import CalendarPopup
 
 
-def _find_tray_clock_window():
-    shell_tray = win32gui.FindWindow("Shell_TrayWnd", None)
+def _find_tray_clock_window(taskbar_hwnd=None):
+    shell_tray = taskbar_hwnd or win32gui.FindWindow("Shell_TrayWnd", None)
     if not shell_tray:
         return 0
     tray_notify = win32gui.FindWindowEx(shell_tray, 0, "TrayNotifyWnd", None)
@@ -68,20 +68,26 @@ def _tray_clock_client_size(clock_wnd):
 
 
 class ClockOverlay:
-    def __init__(self, clock_config, global_config, on_open_settings=None):
+    def __init__(self, clock_config, global_config, on_open_settings=None,
+                 taskbar_hwnd=None, parent=None, clock_index=0):
         self.config = clock_config.copy()
         self.global_config = global_config
         self.on_open_settings = on_open_settings
-        self.root = tk.Tk()
+        self._taskbar_wnd = taskbar_hwnd or win32gui.FindWindow("Shell_TrayWnd", None)
+        self.clock_index = clock_index
+        self.root = tk.Toplevel(parent) if parent is not None else tk.Tk()
+        self._closed = False
+        self._clock_job = self._position_job = self._theme_job = None
+        self._font_metrics = None
 
-        self.sys_fg, self.sys_bg = get_system_theme()
+        self.sys_fg, self.sys_bg = get_system_theme(self._taskbar_wnd)
         self._calendar_popup = None
         self._single_click_job = None
         self._last_click_time  = 0.0   # 用于双击计时（不依赖 WM_LBUTTONDBLCLK）
         self._embedded = False       # 是否已完成 SetParent 嵌入
         self._modern_clock = False
         self._clock_rect = None
-        self._clock_wnd = 0          # TrayClockWClass hwnd 快取
+        self._clock_wnd = 0          # 此屏幕的原生时钟或任务栏窗口
 
         bg = self._resolve_bg_color()
         fg = self._resolve_font_color()
@@ -147,10 +153,13 @@ class ClockOverlay:
 
     def _try_embed(self):
         """Windows 10 嵌入原生窗口；Windows 11 覆盖 UIA 返回的时钟矩形。"""
-        clock_wnd = _find_tray_clock_window()
+        if not self._taskbar_wnd or not win32gui.IsWindow(self._taskbar_wnd):
+            self.root.withdraw()
+            return
+        clock_wnd = _find_tray_clock_window(self._taskbar_wnd)
         self._modern_clock = not bool(clock_wnd)
         if not clock_wnd:
-            self._clock_wnd = win32gui.FindWindow("Shell_TrayWnd", None)
+            self._clock_wnd = self._taskbar_wnd
             self.position_overlay()
             return
         self._clock_wnd = clock_wnd
@@ -166,6 +175,8 @@ class ClockOverlay:
 
     def force_topmost(self):
         """跟随任务栏布局；全屏应用或任务栏隐藏时收起 Windows 11 覆盖窗口。"""
+        if self._closed:
+            return
         try:
             if self._clock_wnd and not win32gui.IsWindow(self._clock_wnd):
                 self._embedded = False
@@ -176,7 +187,7 @@ class ClockOverlay:
                 self.position_overlay()
         except Exception as error:
             print(f"[overlay] position error: {error}")
-        self.root.after(500, self.force_topmost)
+        self._position_job = self.root.after(500, self.force_topmost)
 
     def _fullscreen_covers_taskbar(self):
         foreground = win32gui.GetForegroundWindow()
@@ -190,12 +201,14 @@ class ClockOverlay:
         return fl <= left and ft <= top and fr >= right and fb >= bottom
 
     def sync_theme(self):
-        new_fg, new_bg = get_system_theme()
+        if self._closed:
+            return
+        new_fg, new_bg = get_system_theme(self._taskbar_wnd)
         if new_fg != self.sys_fg or new_bg != self.sys_bg:
             self.sys_fg = new_fg
             self.sys_bg = new_bg
             self._apply_base_styles()
-        self.root.after(10000, self.sync_theme)
+        self._theme_job = self.root.after(10000, self.sync_theme)
 
     # ------------------------------------------------------------------ #
     #  COLOR HELPERS                                                       #
@@ -212,7 +225,7 @@ class ClockOverlay:
     def _resolve_bg_color(self):
         v = self.config.get("bg_color", "system")
         if v in ("system", "auto", None, ""):
-            sampled = sample_taskbar_color()
+            sampled = sample_taskbar_color(self._taskbar_wnd)
             if sampled:
                 # 这里更新 sys_bg 和 sys_fg，确保字体颜色能即时跟随背景采样更新
                 self.sys_bg = sampled
@@ -304,7 +317,8 @@ class ClockOverlay:
             tz_name  = self.config.get("target_timezone", "Asia/Shanghai")
             language = self.global_config.get("language", "zh")
             self._calendar_popup = CalendarPopup(
-                parent=self.root, tz_name=tz_name, language=language)
+                parent=self.root, tz_name=tz_name, language=language,
+                taskbar_hwnd=self._taskbar_wnd)
             print("[overlay] popup created")
         except Exception as e:
             print(f"[overlay] on_click error: {e}")
@@ -315,6 +329,8 @@ class ClockOverlay:
     # ------------------------------------------------------------------ #
 
     def update_clock(self):
+        if self._closed:
+            return
         tz_name = self.config.get("target_timezone", "Asia/Shanghai")
         now = get_current_time_in_tz(tz_name)
 
@@ -322,7 +338,7 @@ class ClockOverlay:
         text = f"{time_str}\n{date_str}" if self.config.get("show_date", True) else time_str
         self.label.config(text=text)
 
-        self.root.after(1000, self.update_clock)
+        self._clock_job = self.root.after(1000, self.update_clock)
 
     # ------------------------------------------------------------------ #
     #  POSITION (公开，供 apply_window_styles 呼叫)                         #
@@ -347,11 +363,11 @@ class ClockOverlay:
                 return
             self._clock_rect = rect
             w, h = right - left, bottom - top
-            geometry = f"{w}x{h}{left:+d}{top:+d}"
             if self.root.state() == "withdrawn":
                 self.root.deiconify()
-            if self.root.geometry() != geometry:
-                self.root.geometry(geometry)
+            # Tk 的负坐标代表距屏幕右/下边缘的偏移；绝对位置统一交给 Win32。
+            if self.root.winfo_width() != w or self.root.winfo_height() != h:
+                self.root.geometry(f"{w}x{h}")
                 self.root.update_idletasks()
             win32gui.SetWindowPos(
                 self._hwnd, win32con.HWND_TOPMOST, left, top, w, h,
@@ -366,15 +382,26 @@ class ClockOverlay:
                 win32con.SWP_NOACTIVATE | win32con.SWP_SHOWWINDOW,
             )
 
+        self._update_font_for_dpi()
+
+    def _update_font_for_dpi(self):
+        dpi = get_window_dpi(self._hwnd)
+        metrics = (self.config["font_family"], self.config["font_size"], dpi)
+        if metrics != self._font_metrics:
+            self._font_metrics = metrics
+            pixels = max(1, round(self.config["font_size"] * dpi / 72))
+            self.label.config(font=(self.config["font_family"], -pixels),
+                              padx=round(4 * dpi / 96))
+
     # ------------------------------------------------------------------ #
     #  CONFIG UPDATE                                                       #
     # ------------------------------------------------------------------ #
 
     def update_config(self, new_config):
         self.config = new_config.copy()
-        self.sys_fg, self.sys_bg = get_system_theme()
+        self.sys_fg, self.sys_bg = get_system_theme(self._taskbar_wnd)
+        self._font_metrics = None
         self.label.config(
-            font=(self.config["font_family"], self.config["font_size"]),
             fg=self._resolve_font_color(),
             bg=self._resolve_bg_color(),
         )
@@ -393,6 +420,15 @@ class ClockOverlay:
         self.root.mainloop()
 
     def close(self):
+        if self._closed:
+            return
+        self._closed = True
+        for job in (self._clock_job, self._position_job, self._theme_job, self._single_click_job):
+            if job is not None:
+                try:
+                    self.root.after_cancel(job)
+                except tk.TclError:
+                    pass
         try:
             if self._calendar_popup is not None:
                 self._calendar_popup.close()
