@@ -19,7 +19,7 @@ def _find_iscc():
     from_path = shutil.which("ISCC.exe")
     if from_path:
         return from_path
-    # 再看常見安裝目錄
+    # 再看常见安装目录
     for p in INNO_DEFAULT_PATHS:
         if os.path.exists(p):
             return p
@@ -36,7 +36,7 @@ def build_installer():
     iscc = _find_iscc()
     if not iscc:
         raise RuntimeError(
-            "找不到 Inno Setup 編譯器 ISCC.exe，請先安裝 Inno Setup 6。"
+            "找不到 Inno Setup 编译器 ISCC.exe，请先安装 Inno Setup 6。"
         )
     subprocess.check_call([iscc, "installer.iss"])
     print("\nDone! Installer output: dist\\DesktopTimezoneClock-Setup.exe")

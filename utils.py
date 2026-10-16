@@ -40,15 +40,15 @@ def is_already_running():
     return False
 
 def _get_dwm_accent_hex():
-    # 嘗試從 Windows 註冊表獲取 DWM 顏色 (ARGB 格式)
+    # 尝试从 Windows 注册表获取 DWM 颜色 (ARGB 格式)
     try:
         import winreg
-        # DWM 顏色通常比 StartColorMenu 更接近視覺上的工作列顏色
+        # DWM 颜色通常比 StartColorMenu 更接近视觉上的任务栏颜色
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\DWM")
         val, _ = winreg.QueryValueEx(key, "ColorizationColor")
-        # val 是 0xAABBGGRR 或 0AARRGGBB，視版本而定。
-        # 通常 DWM 會把 Accent 色與 Taskbar 混合。
-        # 我們取後 6 位作為基礎
+        # val 是 0xAABBGGRR 或 0AARRGGBB，视版本而定。
+        # 通常 DWM 会把 Accent 色与 Taskbar 混合。
+        # 我们取后 6 位作为基础
         color_hex = f"#{val & 0xFFFFFF:06x}"
         return color_hex
     except Exception:
@@ -57,7 +57,7 @@ def _get_dwm_accent_hex():
 _taskbar_color_cache = {"color": None, "expiry": 0}
 
 def sample_taskbar_color():
-    """採樣工作列背景顏色（使用眾數法，優先採樣時鐘週邊區域）。增加快取以優化效能。"""
+    """采样任务栏背景颜色（使用众数法，优先采样时钟周边区域）。增加快取以优化效能。"""
     global _taskbar_color_cache
     import time
     now = time.time()
@@ -65,10 +65,10 @@ def sample_taskbar_color():
         return _taskbar_color_cache["color"]
 
     try:
-        # 1. 優先嘗試從註冊表獲取 DWM 核心顏色（最準確的主題色基礎）
+        # 1. 优先尝试从注册表获取 DWM 核心颜色（最准确的主题色基础）
         import win32gui, win32api
         
-        # 1. 定位工作列與時鐘
+        # 1. 定位任务栏与时钟
         shell_tray = win32gui.FindWindow("Shell_TrayWnd", None)
         target_wnd = 0
         if shell_tray:
@@ -80,22 +80,25 @@ def sample_taskbar_color():
         if not target_wnd: return "#202020"
             
         rect = win32gui.GetWindowRect(target_wnd)
+        if target_wnd == shell_tray:
+            from taskbar_clock import find_modern_clock_rect
+            rect = find_modern_clock_rect(shell_tray) or rect
+        taskbar_rect = win32gui.GetWindowRect(shell_tray)
         hdc = win32gui.GetDC(0)
         
-        # 2. 多點採樣 (避開邊界與文字中心)
-        # 由於已開啟 DPI Awareness，這裡獲得的座標與 GetPixel 要求的物理像素一致
+        # 2. 多点采样 (避开边界与文字中心)
+        # 由于已开启 DPI Awareness，这里获得的座标与 GetPixel 要求的物理像素一致
+        # 在时钟外、任务栏内部取样，避免采到覆盖层本身而无法跟随主题变化。
         sample_points = [
-            (rect[0] - 10, (rect[1] + rect[3]) // 2),  # 時鐘左側中心
-            (rect[0] - 5,  rect[1] + 5),               # 左上
-            (rect[0] - 15, rect[3] - 5),               # 左下
-            (rect[0] - 25, (rect[1] + rect[3]) // 2),  # 更左側
+            (max(taskbar_rect[0], rect[0] - dx), rect[1] + 2)
+            for dx in (2, 4, 6, 8)
         ]
-        
+
         from collections import Counter
         colors = []
         for x, y in sample_points:
             try:
-                # 確保座標在主螢幕範圍內
+                # 确保座标在主屏幕范围内
                 p = win32gui.GetPixel(hdc, x, y)
                 if p != -1:
                     colors.append(((p & 0xff), (p >> 8) & 0xff, (p >> 16) & 0xff))
@@ -105,7 +108,7 @@ def sample_taskbar_color():
         
         if not colors: return "#202020"
         
-        # 取眾數
+        # 取众数
         most_common = Counter(colors).most_common(1)
         r, g, b = most_common[0][0]
         color_hex = f"#{r:02x}{g:02x}{b:02x}"
@@ -117,7 +120,7 @@ def sample_taskbar_color():
         return "#202020"
 
 def sample_pixel(x, y):
-    """採樣指定螢幕座標的物理像素顏色。"""
+    """采样指定屏幕座标的物理像素颜色。"""
     try:
         hdc = win32gui.GetDC(0)
         p = win32gui.GetPixel(hdc, int(x), int(y))
@@ -128,7 +131,7 @@ def sample_pixel(x, y):
         return "#000000"
 
 def get_color_brightness(hex_color: str) -> float:
-    """計算 HEX 顏色的亮度 (0-255)。"""
+    """计算 HEX 颜色的亮度 (0-255)。"""
     if not hex_color or not hex_color.startswith("#") or len(hex_color) != 7:
         return 0
     try:

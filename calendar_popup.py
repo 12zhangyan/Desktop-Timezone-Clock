@@ -1,13 +1,13 @@
-"""自製日曆 popup。
+"""自制日历 popup。
 
 定位策略：
-  withdraw() → 建立 UI → update() → after(10ms, _show_positioned)
-  _show_positioned：先 deiconify 到螢幕外（-9999），
-  再用 win32gui.SetWindowPos 移到正確螢幕絕對座標。
+  withdraw() → 创建 UI → update() → after(10ms, _show_positioned)
+  _show_positioned：先 deiconify 到屏幕外（-9999），
+  再用 win32gui.SetWindowPos 移到正确屏幕绝对座标。
 
-關閉方式：
-  1. 點擊日曆視窗以外任何地方（FocusOut 偵測，200ms 延遲防誤觸）
-  2. 再次點擊工作列時鐘 (toggle)
+关闭方式：
+  1. 点击日历窗口以外任何地方（FocusOut 侦测，200ms 延迟防误触）
+  2. 再次点击任务栏时钟 (toggle)
   3. 按 Esc
 """
 import calendar
@@ -42,7 +42,7 @@ class CalendarPopup:
     # ------------------------------------------------------------------ #
 
     def __init__(self, parent, tz_name, language="zh"):
-        # 清除任何殘留實例
+        # 清除任何残留实例
         if CalendarPopup._instance is not None:
             try:
                 CalendarPopup._instance._do_destroy()
@@ -63,11 +63,11 @@ class CalendarPopup:
         self.display_year  = now.year
         self.display_month = now.month
 
-        # ── 日曆視窗（無遮罩，改用 FocusOut 偵測點擊外部）──────────────
+        # ── 日历窗口（无遮罩，改用 FocusOut 侦测点击外部）──────────────
         self.root = tk.Toplevel(parent)
         self.root.overrideredirect(True)
         self.root.attributes("-topmost", True)
-        self.root.withdraw()                      # 先隱藏，定位後再顯示
+        self.root.withdraw()                      # 先隐藏，定位后再显示
         self.root.config(bg=self.BORDER, padx=1, pady=1)
 
         self.inner = tk.Frame(self.root, bg=self.BG, padx=14, pady=12)
@@ -79,9 +79,9 @@ class CalendarPopup:
 
         self.root.bind("<Escape>", lambda e: self.close())
         self.root.bind("<FocusOut>", self._on_focus_out)
-        self.root.attributes("-alpha", 0)  # 先透明，定位後才顯示，避免閃爍
+        self.root.attributes("-alpha", 0)  # 先透明，定位后才显示，避免闪烁
 
-        # ── 讓 Tkinter 完成佈局計算（視窗仍隱藏中）─────────────────────
+        # ── 让 Tkinter 完成布局计算（窗口仍隐藏中）─────────────────────
         self.root.update()
         self._w = self.root.winfo_width()
         self._h = self.root.winfo_height()
@@ -98,7 +98,7 @@ class CalendarPopup:
     # ------------------------------------------------------------------ #
 
     def _build_ui(self):
-        # 標題區域（可拖動）
+        # 标题区域（可拖动）
         tz_lbl = tk.Label(
             self.inner, text=self.tz_name,
             font=("Segoe UI", 9), bg=self.BG, fg=self.FG_DIM,
@@ -118,7 +118,7 @@ class CalendarPopup:
         )
         self.date_label.pack(anchor="w", pady=(0, 12))
 
-        # 讓標題區域可拖動
+        # 让标题区域可拖动
         for w in (tz_lbl, self.time_label, self.date_label):
             w.bind("<ButtonPress-1>", self._drag_start)
             w.bind("<B1-Motion>",     self._drag_motion)
@@ -242,21 +242,21 @@ class CalendarPopup:
         return x, y
 
     def _show_positioned(self):
-        """顯示 popup：先透明定位，再恢復不透明，消除左上角閃爍。"""
+        """显示 popup：先透明定位，再恢复不透明，消除左上角闪烁。"""
         if self._closed:
             return
         try:
             x, y = self._calc_position()
 
-            # 透明狀態下 deiconify，使用者看不到它在 (0,0) 的瞬間
+            # 透明状态下 deiconify，用户看不到它在 (0,0) 的瞬间
             self.root.deiconify()
             self.root.update()
 
-            # 移到正確位置
+            # 移到正确位置
             self.root.geometry(f"+{x}+{y}")
             self.root.update_idletasks()
 
-            # 恢復不透明（現在才讓使用者看到）
+            # 恢复不透明（现在才让用户看到）
             self.root.attributes("-alpha", 1)
 
             print(f"[popup] shown at ({x},{y})  size={self._w}x{self._h}")
@@ -283,12 +283,12 @@ class CalendarPopup:
     # ------------------------------------------------------------------ #
 
     def _drag_start(self, event):
-        """記錄拖動起點（滑鼠相對於視窗左上角的偏移）。"""
+        """记录拖动起点（鼠标相对于窗口左上角的偏移）。"""
         self._drag_start_x = event.x_root - self.root.winfo_x()
         self._drag_start_y = event.y_root - self.root.winfo_y()
 
     def _drag_motion(self, event):
-        """拖動中，即時更新視窗位置。"""
+        """拖动中，即时更新窗口位置。"""
         if self._closed:
             return
         x = event.x_root - self._drag_start_x
@@ -296,13 +296,13 @@ class CalendarPopup:
         self.root.geometry(f"+{x}+{y}")
 
     # ------------------------------------------------------------------ #
-    #  FOCUS OUT → 點擊外部關閉                                           #
+    #  FOCUS OUT → 点击外部关闭                                           #
     # ------------------------------------------------------------------ #
 
     def _on_focus_out(self, event):
         if self._closed:
             return
-        # 200ms 延遲：防止點擊視窗內子元件（nav 按鈕等）時誤觸
+        # 200ms 延迟：防止点击窗口内子组件（nav 按钮等）时误触
         if self._focus_timer:
             try:
                 self.root.after_cancel(self._focus_timer)
@@ -315,7 +315,7 @@ class CalendarPopup:
             return
         try:
             focused = self.root.focus_get()
-            # 若焦點仍在 popup 視窗或其子元件內，不關閉
+            # 若焦点仍在 popup 窗口或其子组件内，不关闭
             if focused is not None:
                 w = str(focused)
                 r = str(self.root)

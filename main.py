@@ -11,17 +11,17 @@ import sys
 import ctypes
 
 try:
-    # 優先嘗試 Windows 10 1703+ 的 Per-Monitor V2 DPI awareness
+    # 优先尝试 Windows 10 1703+ 的 Per-Monitor V2 DPI awareness
     # -4 代表 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
     ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
 except Exception:
     try:
-        # 嘗試 Windows 8.1+ 的 Per-Monitor DPI awareness
+        # 尝试 Windows 8.1+ 的 Per-Monitor DPI awareness
         # 2 代表 PROCESS_PER_MONITOR_DPI_AWARE
         ctypes.windll.shcore.SetProcessDpiAwareness(2)
     except Exception:
         try:
-            # 備用為 System DPI awareness
+            # 备用为 System DPI awareness
             # 1 代表 PROCESS_SYSTEM_DPI_AWARE
             ctypes.windll.shcore.SetProcessDpiAwareness(1)
         except Exception:
@@ -39,7 +39,7 @@ from utils import is_already_running, is_autostart_enabled
 
 
 class DesktopTrayIcon(pystray_win32.Icon):
-    """自訂 Windows 托盤事件：單擊 / 雙擊分流。"""
+    """自定义 Windows 托盘事件：单击 / 双击分流。"""
     _DBLCLICK_SEC = 0.35
     _WM_LBUTTONDBLCLK = getattr(win32con, "WM_LBUTTONDBLCLK", 0x0203)
 
@@ -68,7 +68,7 @@ class DesktopTrayIcon(pystray_win32.Icon):
             self._on_double_left_click(self)
 
     def _on_notify(self, wparam, lparam):
-        # Windows 可能送 WM_LBUTTONDBLCLK，也可能只送兩次 WM_LBUTTONUP，兩者都處理
+        # Windows 可能送 WM_LBUTTONDBLCLK，也可能只送两次 WM_LBUTTONUP，两者都处理
         if lparam == self._WM_LBUTTONDBLCLK:
             self._fire_double_click()
             return
@@ -93,11 +93,11 @@ class DesktopClockApp:
             sys.exit(0)
 
         print("\n" + "="*40)
-        print(">>> Desktop Timezone Clock v1.0.1 Starting...")
+        print(">>> Desktop Timezone Clock v1.1.0 Starting...")
         
         self.config = load_config()
         
-        # 同步開機啟動狀態與註冊表 (解決安裝時勾選自動啟動但設定頁未同步的問題)
+        # 同步开机启动状态与注册表 (解决安装时勾选自动启动但设置页未同步的问题)
         try:
             from utils import is_autostart_enabled
             registry_enabled = is_autostart_enabled()

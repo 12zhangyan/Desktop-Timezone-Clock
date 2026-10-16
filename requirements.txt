@@ -1,0 +1,6 @@
+pywin32
+pystray
+Pillow
+tzdata
+requests
+customtkinter
