@@ -2,7 +2,7 @@
 #define MyAppExeName "DesktopTimezoneClock.exe"
 #define MyAppPublisher "Kanaoda"
 #define MyAppURL "https://github.com/Kanaoda/Desktop-Timezone-Clock"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.1.1"
 
 [Setup]
 AppId={{B3F73D90-5E9E-4A9D-A3D7-3B4DE8E302A2}

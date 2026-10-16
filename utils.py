@@ -54,22 +54,21 @@ def _get_dwm_accent_hex():
     except Exception:
         return None
 
-_taskbar_color_cache = {"color": None, "expiry": 0}
+_taskbar_color_cache = {}
 
-def sample_taskbar_color():
+def sample_taskbar_color(taskbar_hwnd=None):
     """采样任务栏背景颜色（使用众数法，优先采样时钟周边区域）。增加快取以优化效能。"""
     global _taskbar_color_cache
     import time
     now = time.time()
-    if _taskbar_color_cache["color"] and now < _taskbar_color_cache["expiry"]:
-        return _taskbar_color_cache["color"]
+    taskbar_hwnd = taskbar_hwnd or win32gui.FindWindow("Shell_TrayWnd", None)
+    cached = _taskbar_color_cache.get(taskbar_hwnd, {})
+    if cached.get("color") and now < cached["expiry"]:
+        return cached["color"]
 
     try:
-        # 1. 优先尝试从注册表获取 DWM 核心颜色（最准确的主题色基础）
-        import win32gui, win32api
-        
         # 1. 定位任务栏与时钟
-        shell_tray = win32gui.FindWindow("Shell_TrayWnd", None)
+        shell_tray = taskbar_hwnd
         target_wnd = 0
         if shell_tray:
             tray_notify = win32gui.FindWindowEx(shell_tray, 0, "TrayNotifyWnd", None)
@@ -98,7 +97,7 @@ def sample_taskbar_color():
         colors = []
         for x, y in sample_points:
             try:
-                # 确保座标在主屏幕范围内
+                # 使用虚拟桌面的物理坐标，兼容扩展屏和负坐标
                 p = win32gui.GetPixel(hdc, x, y)
                 if p != -1:
                     colors.append(((p & 0xff), (p >> 8) & 0xff, (p >> 16) & 0xff))
@@ -113,7 +112,7 @@ def sample_taskbar_color():
         r, g, b = most_common[0][0]
         color_hex = f"#{r:02x}{g:02x}{b:02x}"
         
-        _taskbar_color_cache = {"color": color_hex, "expiry": now + 5}
+        _taskbar_color_cache[taskbar_hwnd] = {"color": color_hex, "expiry": now + 5}
         return color_hex
         
     except Exception:
@@ -142,8 +141,8 @@ def get_color_brightness(hex_color: str) -> float:
     except ValueError:
         return 0
 
-def get_system_theme():
-    sampled = sample_taskbar_color()
+def get_system_theme(taskbar_hwnd=None):
+    sampled = sample_taskbar_color(taskbar_hwnd)
     if sampled:
         brightness = get_color_brightness(sampled)
         fg = "black" if brightness > 140 else "white"

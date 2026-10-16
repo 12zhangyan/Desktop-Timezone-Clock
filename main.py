@@ -2,6 +2,7 @@ import copy
 import queue
 import threading
 import time
+import tkinter as tk
 import pystray
 from pystray import _win32 as pystray_win32
 from pystray._util import win32 as tray_win32
@@ -32,6 +33,7 @@ except Exception:
 
 from config_manager import load_config, save_config
 from overlay_window import ClockOverlay
+from taskbar_clock import enumerate_taskbars
 from settings_window import SettingsWindow
 
 from i18n import I18n
@@ -93,7 +95,7 @@ class DesktopClockApp:
             sys.exit(0)
 
         print("\n" + "="*40)
-        print(">>> Desktop Timezone Clock v1.1.0 Starting...")
+        print(">>> Desktop Timezone Clock v1.1.1 Starting...")
         
         self.config = load_config()
         
@@ -107,6 +109,10 @@ class DesktopClockApp:
         except Exception:
             pass
         self.overlays = []
+        self._overlay_by_taskbar = {}
+        self._display_config = self.config
+        self.root = None
+        self._exiting = False
         self.tray_icon = None
         self._settings_win = None
         self._ui_actions = queue.Queue()
@@ -116,9 +122,8 @@ class DesktopClockApp:
         self._ui_actions.put(fn)
 
     def _drain_ui_actions(self):
-        if not self.overlays:
+        if self._exiting:
             return
-        root = self.overlays[0].root
         try:
             while True:
                 fn = self._ui_actions.get_nowait()
@@ -128,7 +133,8 @@ class DesktopClockApp:
                     print(f"[ui] action error: {e}")
         except queue.Empty:
             pass
-        root.after(50, self._drain_ui_actions)
+        if not self._exiting:
+            self.root.after(50, self._drain_ui_actions)
 
     def create_tray_image(self):
         width, height = 64, 64
@@ -144,8 +150,7 @@ class DesktopClockApp:
     # ------------------------------------------------------------------ #
 
     def on_settings(self, icon, item):
-        if self.overlays:
-            self.overlays[0].root.after(0, self._open_settings_window)
+        self._post_ui_action(self._open_settings_window)
 
     def _open_settings_window(self):
         # Prevent duplicate windows
@@ -159,7 +164,7 @@ class DesktopClockApp:
                 pass
             self._settings_win = None
 
-        parent = self.overlays[0].root if self.overlays else None
+        parent = self.root
 
         def on_settings_closed():
             self._restore_config()
@@ -191,14 +196,39 @@ class DesktopClockApp:
         self._apply_config_to_overlays(self.config)
 
     def _apply_config_to_overlays(self, cfg):
-        for i, overlay in enumerate(self.overlays):
-            if i < len(cfg["clocks"]):
-                clock_cfg = cfg["clocks"][i]
-                overlay.root.after(
-                    0, lambda o=overlay, c=clock_cfg, g=cfg: (
-                        setattr(o, "global_config", g),
-                        o.update_config(c)
-                    ))
+        self._display_config = cfg
+        self._sync_taskbars()
+        for overlay in self.overlays:
+            overlay.global_config = cfg
+            overlay.update_config(cfg["clocks"][overlay.clock_index])
+
+    def _sync_taskbars(self):
+        """每个任务栏创建一组时钟；屏幕或 Explorer 变化时移除旧窗口并补齐。"""
+        cfg = self._display_config
+        desired = [(hwnd, index) for hwnd in enumerate_taskbars()
+                   for index in range(len(cfg["clocks"]))]
+        desired_set = set(desired)
+        for key in list(self._overlay_by_taskbar):
+            if key not in desired_set:
+                self._overlay_by_taskbar.pop(key).close()
+        for hwnd, index in desired:
+            key = (hwnd, index)
+            if key not in self._overlay_by_taskbar:
+                self._overlay_by_taskbar[key] = ClockOverlay(
+                    cfg["clocks"][index], cfg,
+                    on_open_settings=self._open_settings_window,
+                    taskbar_hwnd=hwnd, parent=self.root, clock_index=index,
+                )
+        self.overlays = [self._overlay_by_taskbar[key] for key in desired]
+
+    def _refresh_taskbars(self):
+        if self._exiting:
+            return
+        try:
+            self._sync_taskbars()
+        except Exception as error:
+            print(f"[taskbar] refresh error: {error}")
+        self.root.after(2000, self._refresh_taskbars)
 
     # ------------------------------------------------------------------ #
     #  TRAY                                                                #
@@ -206,18 +236,25 @@ class DesktopClockApp:
 
     def on_exit(self, icon, item=None):
         icon.stop()
+        self._post_ui_action(self._shutdown)
+
+    def _shutdown(self):
+        self._exiting = True
         for overlay in self.overlays:
-            overlay.root.after(0, overlay.close)
-        import os
-        os._exit(0)
+            overlay.close()
+        self.overlays.clear()
+        self._overlay_by_taskbar.clear()
+        self.root.destroy()
 
     def _on_tray_single_click(self, icon):
+        self._post_ui_action(self._toggle_first_calendar)
+
+    def _toggle_first_calendar(self):
         if self.overlays:
-            self._post_ui_action(lambda: self.overlays[0].toggle_calendar())
+            self.overlays[0].toggle_calendar()
 
     def _on_tray_double_click(self, icon):
-        if self.overlays:
-            self._post_ui_action(self._open_settings_window)
+        self._post_ui_action(self._open_settings_window)
 
     def run_tray(self):
         menu = pystray.Menu(
@@ -239,20 +276,14 @@ class DesktopClockApp:
     # ------------------------------------------------------------------ #
 
     def run(self):
+        # 控制根窗口不依赖任何屏幕；断开副屏或重启 Explorer 时保留事件循环。
+        self.root = tk.Tk()
+        self.root.withdraw()
+        self._refresh_taskbars()
+        self.root.after(50, self._drain_ui_actions)
         tray_thread = threading.Thread(target=self.run_tray, daemon=True)
         tray_thread.start()
-
-        for clock_cfg in self.config["clocks"]:
-            overlay = ClockOverlay(
-                clock_cfg,
-                self.config,
-                on_open_settings=lambda: self._open_settings_window(),
-            )
-            self.overlays.append(overlay)
-
-        if self.overlays:
-            self.overlays[0].root.after(50, self._drain_ui_actions)
-            self.overlays[0].run()
+        self.root.mainloop()
 
 
 if __name__ == "__main__":
